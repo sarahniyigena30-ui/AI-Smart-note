@@ -14,6 +14,11 @@ interface Recording {
   summary_text?: string
   transcript_text?: string
   key_points?: string[]
+  decisions?: string[]
+  action_items?: string[]
+  topics?: string[]
+  keywords?: string[]
+  insights?: string[]
 }
 
 function App() {

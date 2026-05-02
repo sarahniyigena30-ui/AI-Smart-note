@@ -4,6 +4,7 @@
 
 - **Node.js** 18+ (LTS recommended)
 - **npm** 9+
+- **MySQL** 8+ recommended
 - **OpenAI API Key** (for transcription and summarization)
 - A modern web browser with microphone access
 
@@ -39,9 +40,10 @@ Create a `.env` file in the `backend/` directory:
 PORT=5000
 OPENAI_API_KEY=sk-your-openai-api-key-here
 DB_HOST=localhost
+DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=
-DB_NAME=recording
+DB_PASSWORD=your_mysql_password
+DB_NAME=smartnotes
 NODE_ENV=development
 ```
 

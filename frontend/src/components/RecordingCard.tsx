@@ -10,6 +10,11 @@ interface Recording {
   summary_text?: string
   transcript_text?: string
   key_points?: string | string[]
+  decisions?: string | string[]
+  action_items?: string | string[]
+  topics?: string | string[]
+  keywords?: string | string[]
+  insights?: string | string[]
   file_path?: string
   qa_items?: QAItem[]
 }
@@ -42,16 +47,17 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
     return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`
   }
 
-  const parseKeyPoints = () => {
-    if (!recording.key_points) return []
-    if (typeof recording.key_points === 'string') {
+  const parseList = (value?: string | string[]) => {
+    if (!value) return []
+    if (typeof value === 'string') {
       try {
-        return JSON.parse(recording.key_points)
+        const parsed = JSON.parse(value)
+        return Array.isArray(parsed) ? parsed : []
       } catch {
         return []
       }
     }
-    return Array.isArray(recording.key_points) ? recording.key_points : []
+    return Array.isArray(value) ? value : []
   }
 
   const handleDelete = () => {
@@ -60,7 +66,12 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
     }
   }
 
-  const keyPoints = parseKeyPoints()
+  const keyPoints = parseList(recording.key_points)
+  const decisions = parseList(recording.decisions)
+  const actionItems = parseList(recording.action_items)
+  const topics = parseList(recording.topics)
+  const keywords = parseList(recording.keywords)
+  const insights = parseList(recording.insights)
   const hasContent = recording.transcript_text || recording.summary_text
   const audioSource = recording.file_path ? `/${recording.file_path.replace(/\\/g, '/')}` : ''
   const qaItems = recording.qa_items || []
@@ -110,6 +121,26 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
                   </ul>
                 </div>
               )}
+
+              {decisions.length > 0 && (
+                <StructuredList title="Decisions" items={decisions} />
+              )}
+
+              {actionItems.length > 0 && (
+                <StructuredList title="Action Items" items={actionItems} />
+              )}
+
+              {insights.length > 0 && (
+                <StructuredList title="Insights" items={insights} />
+              )}
+
+              {topics.length > 0 && (
+                <TagList title="Topics" items={topics} />
+              )}
+
+              {keywords.length > 0 && (
+                <TagList title="Keywords" items={keywords} />
+              )}
             </div>
           )}
 
@@ -154,6 +185,34 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
         <button className="btn-delete" onClick={handleDelete}>
           Delete
         </button>
+      </div>
+    </div>
+  )
+}
+
+function StructuredList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="key-points">
+      <h5>{title}</h5>
+      <ul>
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function TagList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="tag-section">
+      <h5>{title}</h5>
+      <div className="tag-list">
+        {items.map((item, index) => (
+          <span className="tag" key={`${title}-${index}`}>
+            {item}
+          </span>
+        ))}
       </div>
     </div>
   )

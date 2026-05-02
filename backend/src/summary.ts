@@ -9,6 +9,11 @@ const openai = new OpenAI({
 export interface SummaryResult {
   summary: string;
   keyPoints: string[];
+  decisions: string[];
+  actionItems: string[];
+  topics: string[];
+  keywords: string[];
+  insights: string[];
 }
 
 export interface QAExtractionItem {
@@ -30,46 +35,55 @@ export async function generateSummaryFromTranscript(transcript: string): Promise
     const limitedTranscript = transcript.substring(0, 10000);
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: process.env.OPENAI_SUMMARY_MODEL || 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are a helpful assistant that summarizes conversations and extracts key points. 
-          Please provide a comprehensive summary and a list of key points (3-5 bullets).
-          Respond with a JSON object containing "summary" (string) and "keyPoints" (array of strings).`,
+          content: `You turn meeting, interview, and discussion transcripts into structured smart notes.
+Return only valid JSON with these fields:
+- summary: a clear paragraph explaining the conversation
+- keyPoints: 3 to 7 important points
+- decisions: confirmed decisions, or an empty array
+- actionItems: concrete follow-up tasks, including owner/deadline in the text when known
+- topics: important topics discussed
+- keywords: searchable keywords
+- insights: useful observations, risks, concerns, or opportunities.
+Do not invent facts that are not in the transcript.`,
         },
         {
           role: 'user',
-          content: `Please summarize the following conversation and extract key points:\n\n${limitedTranscript}`,
+          content: `Create structured smart notes from this transcript:\n\n${limitedTranscript}`,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 500,
+      temperature: 0.2,
+      max_tokens: 1000,
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message.content || '';
 
     try {
       // Try to extract JSON from the response
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          summary: parsed.summary || content,
-          keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
-        };
-      } else {
-        // If no JSON found, return the content as summary
-        return {
-          summary: content,
-          keyPoints: [],
-        };
-      }
+      const parsed = JSON.parse(content);
+      return {
+        summary: parsed.summary || '',
+        keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
+        decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
+        actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
+        topics: Array.isArray(parsed.topics) ? parsed.topics : [],
+        keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+        insights: Array.isArray(parsed.insights) ? parsed.insights : [],
+      };
     } catch (parseError) {
       console.warn('Failed to parse summary JSON, using raw content');
       return {
         summary: content,
         keyPoints: [],
+        decisions: [],
+        actionItems: [],
+        topics: [],
+        keywords: [],
+        insights: [],
       };
     }
   } catch (error) {

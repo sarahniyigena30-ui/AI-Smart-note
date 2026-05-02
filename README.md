@@ -1,18 +1,19 @@
 # AI Smart Note System
 
-Record conversations and get AI-powered summaries in real-time.
+Record conversations and get AI-powered structured notes.
 
-## Features
+## Implemented Features
 
-- 🎤 Record audio conversations
-- 🤖 AI-powered summarization using OpenAI
-- 💾 Store recordings and summaries in database
-- 📝 View conversation history
-- 🎨 Clean, intuitive UI
+- Browser audio recording and audio-file upload
+- Backend speech-to-text transcription with OpenAI
+- Structured AI notes with summary, key points, decisions, action items, topics, keywords, and insights
+- Extracted questions and answers from transcripts
+- MySQL storage for recordings, transcripts, summaries, and Q&A items
+- Recording history, search, playback, pagination, and deletion
 
 ## Project Structure
 
-```
+```text
 .
 ├── backend/          # Express API server
 └── frontend/         # React/Vite UI
@@ -21,34 +22,47 @@ Record conversations and get AI-powered summaries in real-time.
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
+- MySQL 8+ recommended
 - OpenAI API key
-- MySQL (v8.0+ recommended)
 
 ### Installation
 
 ```bash
-# Install dependencies
 npm install
+```
 
-# Set up environment variables
-# Backend: create .env in backend/
-# OPENAI_API_KEY=your_key
-# DB_HOST=localhost
-# DB_USER=root
-# DB_PASSWORD=your_password
-# DB_NAME=recording
+Create `backend/.env`:
 
-# Start development servers
+```bash
+PORT=5000
+OPENAI_API_KEY=your_key
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=smartnotes
+NODE_ENV=development
+```
+
+Initialize the database:
+
+```bash
+npm run db:init --workspace=backend
+```
+
+Start development servers:
+
+```bash
 npm run dev
 ```
 
-### Build for Production
+- Backend API: http://localhost:5000
+- Frontend app: http://localhost:3000
+
+## Build
 
 ```bash
 npm run build
 ```
-
-## License
-
-MIT

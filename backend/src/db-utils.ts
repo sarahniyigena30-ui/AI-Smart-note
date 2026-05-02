@@ -14,12 +14,52 @@ export interface QAItem {
   confidence?: number
 }
 
+export interface SmartNoteFields {
+  keyPoints?: string[]
+  decisions?: string[]
+  actionItems?: string[]
+  topics?: string[]
+  keywords?: string[]
+  insights?: string[]
+}
+
+const parseJsonArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string' || !value) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const normalizeRecording = async (recording: any) => {
+  if (!recording) return recording
+
+  recording.key_points = parseJsonArray(recording.key_points)
+  recording.decisions = parseJsonArray(recording.decisions)
+  recording.action_items = parseJsonArray(recording.action_items)
+  recording.topics = parseJsonArray(recording.topics)
+  recording.keywords = parseJsonArray(recording.keywords)
+  recording.insights = parseJsonArray(recording.insights)
+  recording.qa_items = await getQAItems(recording.id)
+
+  return recording
+}
+
 export async function getRecordingWithDetails(recordingId: string) {
   const recording = await dbGet(
     `
     SELECT r.*, 
            s.summary_text, 
            s.key_points,
+           s.decisions,
+           s.action_items,
+           s.topics,
+           s.keywords,
+           s.insights,
            t.transcript_text 
     FROM recordings r
     LEFT JOIN summaries s ON r.id = s.recording_id
@@ -29,10 +69,7 @@ export async function getRecordingWithDetails(recordingId: string) {
     [recordingId]
   )
 
-  if (!recording) return recording
-
-  recording.qa_items = await getQAItems(recordingId)
-  return recording
+  return normalizeRecording(recording)
 }
 
 export async function getRecordingsPaginated(page: number = 1, limit: number = 10) {
@@ -43,6 +80,11 @@ export async function getRecordingsPaginated(page: number = 1, limit: number = 1
     SELECT r.*, 
            s.summary_text, 
            s.key_points,
+           s.decisions,
+           s.action_items,
+           s.topics,
+           s.keywords,
+           s.insights,
            t.transcript_text 
     FROM recordings r
     LEFT JOIN summaries s ON r.id = s.recording_id
@@ -54,11 +96,11 @@ export async function getRecordingsPaginated(page: number = 1, limit: number = 1
   )
 
   for (const recording of recordings) {
-    recording.qa_items = await getQAItems(recording.id)
+    await normalizeRecording(recording)
   }
 
   const countResult = await dbGet('SELECT COUNT(*) as total FROM recordings')
-  const total = countResult?.total || 0
+  const total = Number(countResult?.total || 0)
 
   return {
     data: recordings,
@@ -74,23 +116,37 @@ export async function getRecordingsPaginated(page: number = 1, limit: number = 1
 export async function searchRecordings(query: string, limit: number = 50) {
   const searchTerm = `%${query}%`
 
-  return dbAll(
+  const recordings = await dbAll(
     `
     SELECT r.*, 
            s.summary_text, 
            s.key_points,
+           s.decisions,
+           s.action_items,
+           s.topics,
+           s.keywords,
+           s.insights,
            t.transcript_text 
     FROM recordings r
     LEFT JOIN summaries s ON r.id = s.recording_id
     LEFT JOIN transcripts t ON r.id = t.recording_id
-    WHERE r.title LIKE ? 
-       OR t.transcript_text LIKE ?
-       OR s.summary_text LIKE ?
+    WHERE LOWER(r.title) LIKE LOWER(?)
+       OR LOWER(t.transcript_text) LIKE LOWER(?)
+       OR LOWER(s.summary_text) LIKE LOWER(?)
+       OR LOWER(CAST(s.key_points AS CHAR)) LIKE LOWER(?)
+       OR LOWER(CAST(s.topics AS CHAR)) LIKE LOWER(?)
+       OR LOWER(CAST(s.keywords AS CHAR)) LIKE LOWER(?)
     ORDER BY r.created_at DESC
     LIMIT ?
   `,
-    [searchTerm, searchTerm, searchTerm, limit]
+    [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, limit]
   )
+
+  for (const recording of recordings) {
+    await normalizeRecording(recording)
+  }
+
+  return recordings
 }
 
 export async function getQAItems(recordingId: string) {
@@ -143,14 +199,36 @@ export async function createTranscript(recordingId: string, transcriptText: stri
 export async function createSummary(
   recordingId: string,
   summaryText: string,
-  keyPoints: string[] = []
+  smartNoteFields: SmartNoteFields = {}
 ) {
   const summaryId = uuidv4()
 
   await dbRun(
-    `INSERT INTO summaries (id, recording_id, summary_text, key_points, created_at, updated_at)
-     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-    [summaryId, recordingId, summaryText, JSON.stringify(keyPoints)]
+    `INSERT INTO summaries (
+       id,
+       recording_id,
+       summary_text,
+       key_points,
+       decisions,
+       action_items,
+       topics,
+       keywords,
+       insights,
+       created_at,
+       updated_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [
+      summaryId,
+      recordingId,
+      summaryText,
+      JSON.stringify(smartNoteFields.keyPoints || []),
+      JSON.stringify(smartNoteFields.decisions || []),
+      JSON.stringify(smartNoteFields.actionItems || []),
+      JSON.stringify(smartNoteFields.topics || []),
+      JSON.stringify(smartNoteFields.keywords || []),
+      JSON.stringify(smartNoteFields.insights || []),
+    ]
   )
 
   return summaryId

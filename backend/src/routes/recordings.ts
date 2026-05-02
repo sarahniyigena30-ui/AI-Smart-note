@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express'
-import { dbRun, dbGet } from '../database.js'
 import {
   getRecordingsPaginated,
   getRecordingWithDetails,
@@ -93,6 +92,42 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
+// Search recordings
+router.get('/search/query', async (req: Request, res: Response) => {
+  try {
+    const query = (req.query.q as string)?.trim()
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Search query is required',
+      })
+    }
+
+    if (query.length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'Search query is too long',
+      })
+    }
+
+    const results = await searchRecordings(query)
+
+    res.json({
+      success: true,
+      data: results,
+      count: results.length,
+    })
+  } catch (error) {
+    console.error('Error searching recordings:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to search recordings',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+})
+
 // GET single recording with details
 router.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -113,15 +148,6 @@ router.get('/:id', async (req: Request, res: Response) => {
         success: false,
         error: 'Recording not found',
       })
-    }
-
-    // Parse key_points if it's a JSON string
-    if (recording.key_points && typeof recording.key_points === 'string') {
-      try {
-        recording.key_points = JSON.parse(recording.key_points)
-      } catch {
-        recording.key_points = []
-      }
     }
 
     res.json({
@@ -177,7 +203,15 @@ router.post('/upload', upload.single('audio'), async (req: Request, res: Respons
       const recordingId = await createRecording(title, filePath, fileSize)
 
       let transcript = ''
-      let summaryData: SummaryResult = { summary: '', keyPoints: [] }
+      let summaryData: SummaryResult = {
+        summary: '',
+        keyPoints: [],
+        decisions: [],
+        actionItems: [],
+        topics: [],
+        keywords: [],
+        insights: [],
+      }
 
       // Transcribe audio
       try {
@@ -204,7 +238,14 @@ router.post('/upload', upload.single('audio'), async (req: Request, res: Respons
           summaryData = await generateSummaryFromTranscript(transcript)
           console.log('Summary generated successfully')
 
-          await createSummary(recordingId, summaryData.summary, summaryData.keyPoints)
+          await createSummary(recordingId, summaryData.summary, {
+            keyPoints: summaryData.keyPoints,
+            decisions: summaryData.decisions,
+            actionItems: summaryData.actionItems,
+            topics: summaryData.topics,
+            keywords: summaryData.keywords,
+            insights: summaryData.insights,
+          })
         } catch (error) {
           console.error('Summary generation error:', error)
         }
@@ -319,42 +360,6 @@ router.get('/:id/download', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to download recording',
-    })
-  }
-})
-
-// Search recordings
-router.get('/search/query', async (req: Request, res: Response) => {
-  try {
-    const query = (req.query.q as string)?.trim()
-
-    if (!query) {
-      return res.status(400).json({
-        success: false,
-        error: 'Search query is required',
-      })
-    }
-
-    if (query.length > 200) {
-      return res.status(400).json({
-        success: false,
-        error: 'Search query is too long',
-      })
-    }
-
-    const results = await searchRecordings(query)
-
-    res.json({
-      success: true,
-      data: results,
-      count: results.length,
-    })
-  } catch (error) {
-    console.error('Error searching recordings:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Failed to search recordings',
-      message: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 })

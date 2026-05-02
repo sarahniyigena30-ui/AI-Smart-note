@@ -143,11 +143,34 @@
 }
 
 .key-points li:before {
-  content: '✓';
+  content: '-';
   position: absolute;
   left: 0;
   color: #27ae60;
   font-weight: bold;
+}
+
+.tag-section {
+  background: #f9f9f9;
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 3px solid #3498db;
+  margin-top: 12px;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  background: #eaf4fc;
+  color: #1f5f86;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 0.86em;
+  font-weight: 700;
 }
 
 .placeholder {
