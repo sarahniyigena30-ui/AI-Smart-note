@@ -1,0 +1,17 @@
+{
+  "name": "ai-note-system",
+  "version": "1.0.0",
+  "description": "AI Smart Note System for recording and summarizing conversations",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspace=backend && npm run build --workspace=frontend"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

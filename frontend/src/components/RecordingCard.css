@@ -1,0 +1,263 @@
+.recording-card {
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.recording-card:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  border-color: #667eea;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-bottom: 2px solid #e0e0e0;
+  gap: 10px;
+}
+
+.card-title-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.card-header h3 {
+  color: #333;
+  margin: 0;
+  flex: 1;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.btn-expand {
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: 5px 10px;
+  color: #667eea;
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.btn-expand:hover {
+  transform: scale(1.2);
+}
+
+.card-meta {
+  display: flex;
+  gap: 15px;
+  padding: 12px 16px;
+  background: #f9f9f9;
+  font-size: 0.9em;
+  color: #666;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.card-content {
+  padding: 20px 16px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section h4 {
+  color: #667eea;
+  margin-bottom: 10px;
+  font-size: 0.95em;
+  margin-top: 0;
+}
+
+.section h5 {
+  color: #555;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+  margin-top: 12px;
+  margin-right: 0;
+}
+
+.transcript,
+.summary {
+  color: #555;
+  line-height: 1.6;
+  font-size: 0.95em;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border-left: 3px solid #667eea;
+  margin: 0;
+}
+
+.key-points {
+  background: #f9f9f9;
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 3px solid #27ae60;
+}
+
+.key-points ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.key-points li {
+  color: #555;
+  padding: 6px 0;
+  padding-left: 20px;
+  position: relative;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.key-points li:before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.placeholder {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+  margin: 0;
+}
+
+.qa-list {
+  display: grid;
+  gap: 12px;
+}
+
+.qa-item {
+  padding: 14px;
+  background: #f9f9f9;
+  border-left: 3px solid #f39c12;
+  border-radius: 4px;
+}
+
+.qa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.qa-meta span {
+  padding: 4px 8px;
+  background: #fff3d9;
+  color: #6d4f18;
+  border-radius: 999px;
+  font-size: 0.82em;
+  font-weight: 700;
+}
+
+.qa-question,
+.qa-answer {
+  margin: 0;
+  color: #444;
+  line-height: 1.55;
+}
+
+.qa-question {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.qa-answer {
+  color: #555;
+}
+
+.card-actions {
+  padding: 16px;
+  border-top: 2px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.audio-player {
+  width: 100%;
+  height: 32px;
+  border-radius: 4px;
+  background: #f9f9f9;
+}
+
+.btn-delete {
+  padding: 10px 16px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95em;
+  transition: all 0.3s ease;
+}
+
+.btn-delete:hover {
+  background-color: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+}
+
+.btn-delete:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-wrap: wrap;
+  }
+
+  .card-title-section {
+    width: 100%;
+  }
+
+  .card-meta {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .card-content {
+    max-height: 400px;
+  }
+
+  .recording-card {
+    max-height: none;
+  }
+}
