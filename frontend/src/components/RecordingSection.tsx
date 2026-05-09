@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import './RecordingSection.css'
 
 interface RecordingSectionProps {
+  authToken: string
   onUpload: () => void
 }
 
@@ -36,12 +37,12 @@ declare global {
   }
 }
 
-export default function RecordingSection({ onUpload }: RecordingSectionProps) {
+export default function RecordingSection({ authToken, onUpload }: RecordingSectionProps) {
   const [isRecording, setIsRecording] = useState(false)
+  const [isStoppingRecording, setIsStoppingRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState('00:00')
   const [isProcessing, setIsProcessing] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
   const [currentSpeaker, setCurrentSpeaker] = useState('')
   const [liveTranscript, setLiveTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
@@ -61,6 +62,7 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const shouldRestartRecognitionRef = useRef(false)
   const finalTranscriptRef = useRef('')
+  const interimTranscriptRef = useRef('')
   const detectedQuestionsRef = useRef<Set<string>>(new Set())
 
   const formatTime = (seconds: number) => {
@@ -73,6 +75,9 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
     setError(null)
     setSuccessMessage(null)
   }
+
+  const getCapturedTranscript = () =>
+    `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.replace(/\s+/g, ' ').trim()
 
   const detectQuestions = (text: string) => {
     const matches = text.match(/[^.!?]*\?/g) || []
@@ -123,6 +128,7 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
       }
 
       finalTranscriptRef.current = finalText
+      interimTranscriptRef.current = interimText
       setLiveTranscript(finalText)
       setInterimTranscript(interimText)
       detectQuestions(`${finalText} ${interimText}`)
@@ -166,7 +172,9 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
     setInterimTranscript('')
     setLiveQuestions([])
     finalTranscriptRef.current = ''
+    interimTranscriptRef.current = ''
     detectedQuestionsRef.current = new Set()
+    setIsStoppingRecording(false)
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -186,7 +194,8 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        await uploadRecording(audioBlob, undefined, finalTranscriptRef.current)
+        await uploadRecording(audioBlob, undefined, getCapturedTranscript())
+        setIsStoppingRecording(false)
       }
 
       mediaRecorder.start()
@@ -213,11 +222,10 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
   }
 
   const stopRecording = () => {
-    if (!mediaRecorderRef.current) return
+    if (!mediaRecorderRef.current || isStoppingRecording) return
 
+    setIsStoppingRecording(true)
     stopLiveTranscription()
-    mediaRecorderRef.current.stop()
-    mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop())
     setIsRecording(false)
 
     if (timerRef.current) {
@@ -229,32 +237,16 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
       cancelAnimationFrame(animationIdRef.current)
       animationIdRef.current = null
     }
-  }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    clearMessages()
-    const file = event.target.files?.[0]
-    if (!file) return
+    window.setTimeout(() => {
+      const recorder = mediaRecorderRef.current
+      if (!recorder) return
 
-    setSelectedFileName(file.name)
-
-    if (!file.type.startsWith('audio/')) {
-      setError('Please select an audio file')
-      setSelectedFileName(null)
-      return
-    }
-
-    if (file.size > 100 * 1024 * 1024) {
-      setError('File is too large. Maximum size is 100MB.')
-      setSelectedFileName(null)
-      return
-    }
-
-    const audioBlob = new Blob([file], { type: file.type })
-    await uploadRecording(audioBlob, file.name)
-
-    event.target.value = ''
-    setSelectedFileName(null)
+      if (recorder.state !== 'inactive') {
+        recorder.stop()
+      }
+      recorder.stream.getTracks().forEach((track) => track.stop())
+    }, 500)
   }
 
   const uploadRecording = async (audioBlob: Blob, fileName?: string, browserTranscript?: string) => {
@@ -280,13 +272,33 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
       })
 
       xhr.addEventListener('load', () => {
-        const response = xhr.responseText ? JSON.parse(xhr.responseText) : {}
+        let response: {
+          success?: boolean
+          error?: string
+          message?: string
+          data?: {
+            transcript?: string
+          }
+        } = {}
+
+        try {
+          response = xhr.responseText ? JSON.parse(xhr.responseText) : {}
+        } catch {
+          response = {
+            error: xhr.responseText || `Upload failed with status ${xhr.status}`,
+          }
+        }
 
         if (xhr.status === 200 && response.success) {
-          setSuccessMessage('Recording saved. Transcript and summary are ready when processing completes.')
+          const transcript = response.data?.transcript?.trim() || browserTranscript?.trim()
+          setSuccessMessage(
+            transcript
+              ? response.message || 'Recording saved. Transcript and notes are ready.'
+              : response.message || 'Recording saved. Add the transcript from the recording history card to generate notes.'
+          )
           onUpload()
         } else {
-          setError(response.error || response.message || 'Failed to upload recording')
+          setError(response.error || response.message || `Failed to upload recording (${xhr.status})`)
         }
 
         setUploadProgress(0)
@@ -304,6 +316,7 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
       })
 
       xhr.open('POST', '/api/recordings/upload')
+      xhr.setRequestHeader('Authorization', `Bearer ${authToken}`)
       xhr.send(formData)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to upload recording'
@@ -331,7 +344,7 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
       canvasCtx.fillStyle = 'rgb(245, 247, 250)'
       canvasCtx.fillRect(0, 0, canvas.width, canvas.height)
       canvasCtx.lineWidth = 2
-      canvasCtx.strokeStyle = 'rgb(102, 126, 234)'
+      canvasCtx.strokeStyle = 'rgb(18, 109, 143)'
       canvasCtx.beginPath()
 
       const sliceWidth = canvas.width / bufferLength
@@ -374,7 +387,7 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
         <button
           className={`btn btn-primary ${isRecording ? 'recording' : ''}`}
           onClick={startRecording}
-          disabled={isRecording || isProcessing}
+          disabled={isRecording || isProcessing || isStoppingRecording}
         >
           {isRecording ? 'Recording...' : 'Start Recording'}
         </button>
@@ -382,21 +395,10 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
         <button
           className="btn btn-danger"
           onClick={stopRecording}
-          disabled={!isRecording || isProcessing}
+          disabled={!isRecording || isProcessing || isStoppingRecording}
         >
-          Stop Recording
+          {isStoppingRecording ? 'Saving...' : 'Stop Recording'}
         </button>
-
-        <label className="btn btn-success">
-          Upload Audio File
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={handleFileUpload}
-            disabled={isProcessing || isRecording}
-            style={{ display: 'none' }}
-          />
-        </label>
       </div>
 
       <div className="speaker-row">
@@ -410,12 +412,6 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
           disabled={isProcessing}
         />
       </div>
-
-      {selectedFileName && !isProcessing && (
-        <div className="selected-file">
-          Selected file: <strong>{selectedFileName}</strong>
-        </div>
-      )}
 
       {isRecording && (
         <div className="recording-info">
@@ -432,7 +428,7 @@ export default function RecordingSection({ onUpload }: RecordingSectionProps) {
           </div>
           {!speechRecognitionSupported ? (
             <p className="live-transcript-muted">
-              Live text is not available in this browser. The backend will still transcribe the saved audio.
+              Automatic transcription is not available in this browser. Use Chrome or Edge so the system can create notes from your recording.
             </p>
           ) : (
             <p>

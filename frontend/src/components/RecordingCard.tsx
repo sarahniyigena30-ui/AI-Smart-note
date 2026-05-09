@@ -31,11 +31,17 @@ interface QAItem {
 
 interface RecordingCardProps {
   recording: Recording
+  authToken: string
   onDelete: (id: string) => void
+  onUpdate: (recording: Recording) => void
 }
 
-export default function RecordingCard({ recording, onDelete }: RecordingCardProps) {
+export default function RecordingCard({ recording, authToken, onDelete, onUpdate }: RecordingCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const [transcriptDraft, setTranscriptDraft] = useState(recording.transcript_text || '')
+  const [isSavingTranscript, setIsSavingTranscript] = useState(false)
+  const [transcriptError, setTranscriptError] = useState<string | null>(null)
+  const [transcriptMessage, setTranscriptMessage] = useState<string | null>(null)
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleString()
 
@@ -66,6 +72,45 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
     }
   }
 
+  const handleTranscriptSave = async () => {
+    const transcript = transcriptDraft.trim()
+
+    if (!transcript) {
+      setTranscriptError('Transcript is required before generating notes.')
+      return
+    }
+
+    setIsSavingTranscript(true)
+    setTranscriptError(null)
+    setTranscriptMessage(null)
+
+    try {
+      const response = await fetch(`/api/recordings/${recording.id}/transcript`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ transcript }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Failed to save transcript.')
+      }
+
+      onUpdate(data.data)
+      setTranscriptDraft(data.data.transcript_text || transcript)
+      setTranscriptMessage(data.message || 'Transcript saved and summary generated.')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save transcript.'
+      setTranscriptError(errorMessage)
+    } finally {
+      setIsSavingTranscript(false)
+    }
+  }
+
   const keyPoints = parseList(recording.key_points)
   const decisions = parseList(recording.decisions)
   const actionItems = parseList(recording.action_items)
@@ -81,7 +126,7 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
       <div className="card-header">
         <div className="card-title-section">
           <h3 title={recording.title}>{recording.title}</h3>
-          {hasContent && <span className="content-badge">Done</span>}
+          {hasContent && <span className="content-badge">Processed</span>}
         </div>
         <button
           className="btn-expand"
@@ -108,7 +153,7 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
 
           {recording.summary_text && (
             <div className="section">
-              <h4>AI Summary</h4>
+              <h4>Structured Summary</h4>
               <p className="summary">{recording.summary_text}</p>
 
               {keyPoints.length > 0 && (
@@ -168,10 +213,33 @@ export default function RecordingCard({ recording, onDelete }: RecordingCardProp
           {!recording.transcript_text && !recording.summary_text && (
             <div className="section">
               <p className="placeholder">
-                Audio uploaded. Add a valid OpenAI API key in backend/.env to generate the transcript and summary.
+                Audio saved, but automatic transcript text was not captured. Add the transcript below to generate structured notes.
               </p>
             </div>
           )}
+
+          <div className="section transcript-editor">
+            <h4>{recording.transcript_text ? 'Update Transcript' : 'Add Transcript'}</h4>
+            <textarea
+              value={transcriptDraft}
+              onChange={(event) => {
+                setTranscriptDraft(event.target.value)
+                setTranscriptError(null)
+                setTranscriptMessage(null)
+              }}
+              placeholder="Type or paste the transcript here..."
+              disabled={isSavingTranscript}
+            />
+            {transcriptError && <p className="transcript-status transcript-status-error">{transcriptError}</p>}
+            {transcriptMessage && <p className="transcript-status transcript-status-success">{transcriptMessage}</p>}
+            <button
+              className="btn-save-transcript"
+              onClick={handleTranscriptSave}
+              disabled={isSavingTranscript || !transcriptDraft.trim()}
+            >
+              {isSavingTranscript ? 'Saving...' : 'Save Transcript and Generate Summary'}
+            </button>
+          </div>
         </div>
       )}
 

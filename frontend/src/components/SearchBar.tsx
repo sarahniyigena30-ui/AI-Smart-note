@@ -14,7 +14,6 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
 
     setQuery(value)
 
-    // Debounce search
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
@@ -33,14 +32,14 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
     <div className="search-bar">
       <input
         type="text"
-        placeholder="🔍 Search by title, transcript, or summary..."
+        placeholder="Search by title, transcript, or summary..."
         value={query}
         onChange={handleInputChange}
         className="search-input"
       />
       {query && (
         <button onClick={handleClear} className="search-clear">
-          ✕
+          x
         </button>
       )}
     </div>

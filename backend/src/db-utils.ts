@@ -189,7 +189,10 @@ export async function createTranscript(recordingId: string, transcriptText: stri
 
   await dbRun(
     `INSERT INTO transcripts (id, recording_id, transcript_text, created_at, updated_at)
-     VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     ON DUPLICATE KEY UPDATE
+       transcript_text = VALUES(transcript_text),
+       updated_at = CURRENT_TIMESTAMP`,
     [transcriptId, recordingId, transcriptText]
   )
 
@@ -217,7 +220,16 @@ export async function createSummary(
        created_at,
        updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+     ON DUPLICATE KEY UPDATE
+       summary_text = VALUES(summary_text),
+       key_points = VALUES(key_points),
+       decisions = VALUES(decisions),
+       action_items = VALUES(action_items),
+       topics = VALUES(topics),
+       keywords = VALUES(keywords),
+       insights = VALUES(insights),
+       updated_at = CURRENT_TIMESTAMP`,
     [
       summaryId,
       recordingId,

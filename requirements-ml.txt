@@ -1,0 +1,8 @@
+pandas
+scikit-learn
+joblib
+librosa
+soundfile
+datasets
+transformers
+torch

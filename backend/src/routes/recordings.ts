@@ -10,11 +10,11 @@ import {
   deleteRecording,
 } from '../db-utils.js'
 import {
-  transcribeAudio,
   generateSummaryFromTranscript,
   extractQuestionsAndAnswers,
   type SummaryResult,
 } from '../summary.js'
+import { transcribeAudio } from '../transcription.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -212,43 +212,47 @@ router.post('/upload', upload.single('audio'), async (req: Request, res: Respons
         keywords: [],
         insights: [],
       }
+      const processingWarnings: string[] = []
 
-      // Transcribe audio
-      try {
-        console.log('Starting transcription for recording:', recordingId)
-        transcript = await transcribeAudio(filePath)
-        console.log('Transcription completed:', transcript.substring(0, 100) + '...')
-
-        await createTranscript(recordingId, transcript)
-      } catch (error) {
-        console.error('Transcription error:', error)
-        transcript = ''
-      }
-
-      if (!transcript && browserTranscript) {
-        console.log('Using browser live transcript as fallback for recording:', recordingId)
+      if (browserTranscript) {
+        console.log('Using browser/manual transcript for recording:', recordingId)
         transcript = browserTranscript
         await createTranscript(recordingId, transcript)
+      } else {
+        // Try to auto-transcribe using Whisper model
+        console.log('Attempting automatic transcription using Whisper...')
+        try {
+          const transcriptionResult = await transcribeAudio(filePath)
+          if (transcriptionResult.success && transcriptionResult.text) {
+            transcript = transcriptionResult.text
+            console.log('Transcription successful:', transcript.substring(0, 100) + '...')
+            await createTranscript(recordingId, transcript)
+          } else {
+            const error = transcriptionResult.error || 'Unknown transcription error'
+            console.warn('Transcription failed:', error)
+            processingWarnings.push(`Automatic transcription failed: ${error}. Add a manual transcript to generate notes.`)
+          }
+        } catch (error) {
+          console.warn('Transcription service error:', error)
+          processingWarnings.push(
+            'Audio was saved. Add a live or manual transcript to generate notes without an external API.'
+          )
+        }
       }
 
-      // Generate summary if transcription was successful
       if (transcript && transcript.length > 0) {
-        try {
-          console.log('Starting summary generation...')
-          summaryData = await generateSummaryFromTranscript(transcript)
-          console.log('Summary generated successfully')
+        console.log('Starting internal summary generation...')
+        summaryData = await generateSummaryFromTranscript(transcript)
+        console.log('Internal summary generated successfully')
 
-          await createSummary(recordingId, summaryData.summary, {
-            keyPoints: summaryData.keyPoints,
-            decisions: summaryData.decisions,
-            actionItems: summaryData.actionItems,
-            topics: summaryData.topics,
-            keywords: summaryData.keywords,
-            insights: summaryData.insights,
-          })
-        } catch (error) {
-          console.error('Summary generation error:', error)
-        }
+        await createSummary(recordingId, summaryData.summary, {
+          keyPoints: summaryData.keyPoints,
+          decisions: summaryData.decisions,
+          actionItems: summaryData.actionItems,
+          topics: summaryData.topics,
+          keywords: summaryData.keywords,
+          insights: summaryData.insights,
+        })
 
         try {
           console.log('Starting Q&A extraction...')
@@ -257,6 +261,7 @@ router.post('/upload', upload.single('audio'), async (req: Request, res: Respons
           console.log(`Q&A extraction completed: ${qaItems.length} item(s)`)
         } catch (error) {
           console.error('Q&A extraction error:', error)
+          processingWarnings.push('Question extraction failed.')
         }
       }
 
@@ -268,8 +273,11 @@ router.post('/upload', upload.single('audio'), async (req: Request, res: Respons
           recording,
           transcript,
           summary: summaryData,
+          warnings: processingWarnings,
         },
-        message: 'Recording processed successfully',
+        message: processingWarnings.length > 0
+          ? processingWarnings.join(' ')
+          : 'Recording processed successfully',
       })
     } catch (error) {
       // Clean up file if database operation fails
@@ -283,6 +291,127 @@ router.post('/upload', upload.single('audio'), async (req: Request, res: Respons
     res.status(500).json({
       success: false,
       error: 'Failed to process upload',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+})
+
+// POST summarize an existing recording that already has a transcript
+router.post('/:id/summarize', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    if (!id.match(/^[0-9a-f\-]{36}$/i)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid recording ID format',
+      })
+    }
+
+    const recording = await getRecordingWithDetails(id)
+
+    if (!recording) {
+      return res.status(404).json({
+        success: false,
+        error: 'Recording not found',
+      })
+    }
+
+    if (!recording.transcript_text?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'This recording does not have a transcript to summarize.',
+      })
+    }
+
+    const summaryData = await generateSummaryFromTranscript(recording.transcript_text)
+    await createSummary(id, summaryData.summary, {
+      keyPoints: summaryData.keyPoints,
+      decisions: summaryData.decisions,
+      actionItems: summaryData.actionItems,
+      topics: summaryData.topics,
+      keywords: summaryData.keywords,
+      insights: summaryData.insights,
+    })
+
+    const qaItems = await extractQuestionsAndAnswers(recording.transcript_text)
+    await createQAItems(id, qaItems)
+
+    const updatedRecording = await getRecordingWithDetails(id)
+
+    res.json({
+      success: true,
+      data: updatedRecording,
+      message: 'Internal summary generated successfully',
+    })
+  } catch (error) {
+    console.error('Error summarizing recording:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to summarize recording',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+})
+
+// POST add or replace a transcript, then generate structured notes
+router.post('/:id/transcript', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const transcript = typeof req.body.transcript === 'string'
+      ? req.body.transcript.trim()
+      : ''
+
+    if (!id.match(/^[0-9a-f\-]{36}$/i)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid recording ID format',
+      })
+    }
+
+    if (!transcript) {
+      return res.status(400).json({
+        success: false,
+        error: 'Transcript is required.',
+      })
+    }
+
+    const recording = await getRecordingWithDetails(id)
+
+    if (!recording) {
+      return res.status(404).json({
+        success: false,
+        error: 'Recording not found',
+      })
+    }
+
+    await createTranscript(id, transcript)
+
+    const summaryData = await generateSummaryFromTranscript(transcript)
+    await createSummary(id, summaryData.summary, {
+      keyPoints: summaryData.keyPoints,
+      decisions: summaryData.decisions,
+      actionItems: summaryData.actionItems,
+      topics: summaryData.topics,
+      keywords: summaryData.keywords,
+      insights: summaryData.insights,
+    })
+
+    const qaItems = await extractQuestionsAndAnswers(transcript)
+    await createQAItems(id, qaItems)
+
+    const updatedRecording = await getRecordingWithDetails(id)
+
+    res.json({
+      success: true,
+      data: updatedRecording,
+      message: 'Transcript saved and structured notes generated.',
+    })
+  } catch (error) {
+    console.error('Error saving transcript:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save transcript',
       message: error instanceof Error ? error.message : 'Unknown error',
     })
   }

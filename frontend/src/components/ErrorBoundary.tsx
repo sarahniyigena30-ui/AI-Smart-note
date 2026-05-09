@@ -33,7 +33,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       return (
         <div className="error-boundary">
           <div className="error-container">
-            <h1>⚠️ Something went wrong</h1>
+            <h1>Something went wrong</h1>
             <p className="error-message">{this.state.error?.message}</p>
             <button onClick={this.handleReset} className="btn-reset">
               Try Again

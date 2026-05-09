@@ -1,44 +1,32 @@
-# AI Smart Note System - Setup and Installation Guide
+# Setup and Installation Guide
+
+## Project
+
+AI Web-Based Smart Note System for Conversation Recording and Deep Summarization
+
+This guide explains how to run the system locally without external AI APIs. The backend stores audio and transcript data, then uses internal NLP logic to generate structured notes.
 
 ## Prerequisites
 
-- **Node.js** 18+ (LTS recommended)
-- **npm** 9+
-- **MySQL** 8+ recommended
-- **OpenAI API Key** (for transcription and summarization)
-- A modern web browser with microphone access
+- Node.js 18 or newer
+- npm 9 or newer
+- MySQL 8 recommended
+- A modern browser with microphone access
 
-## Quick Start
+## Install Dependencies
 
-### 1. Clone/Extract the Project
-
-Extract the project files to your desired location.
-
-### 2. Install Dependencies
+From the project root:
 
 ```bash
-# Install root dependencies
 npm install
-
-# Install backend dependencies
-cd backend
-npm install
-cd ..
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
 ```
 
-### 3. Configure Environment Variables
+## Configure Environment Variables
 
-Create a `.env` file in the `backend/` directory:
+Create `backend/.env`:
 
 ```bash
-# Backend configuration
 PORT=5000
-OPENAI_API_KEY=sk-your-openai-api-key-here
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
@@ -47,215 +35,105 @@ DB_NAME=smartnotes
 NODE_ENV=development
 ```
 
-Get your OpenAI API key from: https://platform.openai.com/api-keys
+No OpenAI key, Whisper key, or other external AI API key is required.
 
-### 4. Start Development Servers
+## Initialize the Database
+
+Make sure MySQL is running, then run:
 
 ```bash
-# From the root directory
+npm run db:init --workspace=backend
+```
+
+The database initializer creates the `smartnotes` database if needed and applies the schema in `backend/database/schema.sql`.
+
+## Start Development Servers
+
+```bash
 npm run dev
 ```
 
-This will start:
-- **Backend API**: http://localhost:5000
-- **Frontend App**: http://localhost:3000
+This starts:
 
-### 5. Access the Application
+- Backend API: http://localhost:5000
+- Frontend app: http://localhost:3000
 
-Open your browser and navigate to: **http://localhost:3000**
+Open the frontend URL in your browser.
 
-## Features
+## Main Workflow
 
-### Recording
-- 🎤 Direct microphone recording with real-time waveform visualization
-- 📤 Upload existing audio files (MP3, WAV, M4A, etc.)
-- ⏱️ Recording timer with visual feedback
-- 🔊 Progress tracking during processing
+1. Start a recording from the web interface.
+2. Allow microphone access in the browser.
+3. Speak during the recording. If the browser supports speech recognition, transcript text appears live.
+4. Stop the recording. The audio and transcript are sent to the backend.
+5. The backend stores the record and generates structured notes using internal NLP.
+6. Review the transcript, summary, key points, decisions, action items, topics, keywords, and Q&A items in the recording history.
 
-### AI Processing
-- 🤖 Automatic speech-to-text transcription (OpenAI Whisper)
-- ✨ AI-powered summaries (GPT-3.5-turbo)
-- 📌 Automatic key points extraction
-- ⚡ Fast processing with real-time status updates
+For uploaded audio files, paste the transcript in the transcript field before upload if you want the system to generate notes.
 
-### Management
-- 📚 Complete recording history
-- 🔍 Full-text search across transcripts and summaries
-- 📄 View transcripts, summaries, and key points
-- 🎵 Play recordings directly in the app
-- 🗑️ Delete recordings with confirmation
-- 📖 Paginated listing with 10 recordings per page
+## Available Scripts
 
-## Project Structure
+Root:
 
+```bash
+npm run dev
+npm run build
 ```
-.
-├── backend/                    # Express API Server
-│   ├── src/
-│   │   ├── index.ts           # Main server file
-│   │   ├── database.ts        # Database initialization
-│   │   ├── summary.ts         # OpenAI integration
-│   │   └── routes/
-│   │       └── recordings.ts  # API routes
-│   ├── database/
-│   │   └── schema.sql         # Database schema
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── uploads/               # Audio storage
-│
-├── frontend/                   # React + Vite App
-│   ├── src/
-│   │   ├── main.tsx          # Entry point
-│   │   ├── App.tsx           # Main component
-│   │   ├── App.css           # Global styles
-│   │   └── components/
-│   │       ├── RecordingSection.tsx    # Recording interface
-│   │       ├── RecordingList.tsx       # Recordings grid
-│   │       ├── RecordingCard.tsx       # Individual recording card
-│   │       ├── SearchBar.tsx           # Search functionality
-│   │       └── ErrorBoundary.tsx       # Error handling
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-│
-├── package.json               # Root workspace config
-└── README.md
+
+Backend:
+
+```bash
+npm run dev --workspace=backend
+npm run build --workspace=backend
+npm run start --workspace=backend
+npm run db:init --workspace=backend
+```
+
+Frontend:
+
+```bash
+npm run dev --workspace=frontend
+npm run build --workspace=frontend
+npm run preview --workspace=frontend
 ```
 
 ## API Endpoints
 
-### GET /api/recordings
-Get all recordings with pagination
-- **Query params**: `page=1&limit=10`
-- **Returns**: List of recordings with metadata
-
-### GET /api/recordings/:id
-Get a single recording with full details
-- **Returns**: Recording with transcript and summary
-
-### GET /api/recordings/search/query
-Search recordings by title, transcript, or summary
-- **Query params**: `q=search-term`
-- **Returns**: Matching recordings
-
-### POST /api/recordings/upload
-Upload and process audio file
-- **Form data**: 
-  - `audio`: Audio file (required)
-  - `title`: Recording title (optional)
-- **Returns**: Recording details with transcript and summary
-
-### DELETE /api/recordings/:id
-Delete a recording
-- **Returns**: Success confirmation
-
-### GET /api/recordings/:id/download
-Download a recording file
-- **Returns**: Audio file download
+- `GET /api/status` - API health and processing mode
+- `GET /api/recordings` - paginated recording list
+- `GET /api/recordings/:id` - recording details
+- `GET /api/recordings/search/query?q=term` - search by title, transcript, or summary
+- `POST /api/recordings/upload` - upload audio and optional transcript
+- `POST /api/recordings/:id/summarize` - regenerate internal notes from an existing transcript
+- `GET /api/recordings/:id/download` - download audio
+- `DELETE /api/recordings/:id` - delete a recording
 
 ## Troubleshooting
 
 ### Microphone Access Denied
-- Check browser permissions for microphone
-- Firefox/Chrome: Click lock icon in address bar → Allow microphone
-- Safari: System Preferences → Security & Privacy → Microphone
 
-### OpenAI API Errors
-- Verify API key is correct in `.env`
-- Check API key has sufficient credits
-- Ensure API endpoint is accessible
+Check browser permissions and allow microphone access for the local site.
 
-### Database Issues
-- Check your MySQL credentials in `.env`
-- Ensure the MySQL service is running on your machine
-- Run `npm run db:init` to recreate the schema if needed
-- Ensure `uploads/` directory exists
-- Check file permissions in the directory
+### No Live Transcript Appears
+
+Live speech recognition depends on browser support. The recording is still saved. To generate notes for an audio file, paste a transcript before upload.
+
+### Database Connection Fails
+
+Confirm that MySQL is running and that the credentials in `backend/.env` are correct. Then run the database initialization command again.
 
 ### Port Already in Use
-- Backend: Change `PORT` in `.env` or kill process using port 5000
-- Frontend: Vite will auto-increment to 3001 if 3000 is taken
 
-### Slow Transcription
-- Whisper API can take 1-2 minutes for longer audio
-- Keep the app open; processing continues in background
-- Refresh to see updated status
+Change `PORT` in `backend/.env`, or stop the process already using the configured port. Vite may automatically choose another frontend port if `3000` is busy.
 
-## Development
+## Evaluation Guidance
 
-### Build for Production
+For the research evaluation story, prepare a small set of meeting or interview transcripts with manual notes. Compare the generated notes against the manual notes using:
 
-```bash
-# Build both frontend and backend
-npm run build
+- Coverage of key points
+- Correctness of decisions and action items
+- Keyword/topic relevance
+- Time saved during review
+- User satisfaction from reviewers
 
-# Build backend only
-cd backend && npm run build
-
-# Build frontend only
-cd frontend && npm run build
-```
-
-### Database Management
-
-```bash
-# Initialize database manually
-cd backend
-npm run db:init
-```
-
-### Available Scripts
-
-**Root:**
-- `npm run dev` - Start development servers
-- `npm run build` - Build both apps
-
-**Backend:**
-- `npm run dev` - Start with hot reload
-- `npm run build` - Compile TypeScript
-- `npm run start` - Run compiled code
-- `npm run db:init` - Initialize database
-
-**Frontend:**
-- `npm run dev` - Start Vite dev server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-
-## Performance Optimization
-
-### Frontend
-- Component lazy loading for better performance
-- Debounced search (300ms)
-- Pagination to reduce memory usage
-- Canvas-based waveform visualization
-
-### Backend
-- Efficient MySQL queries with proper connection pooling
-- Stream-based file handling
-- Async/await for non-blocking operations
-- Proper foreign key constraints for data integrity
-
-## Security Notes
-
-- API key is server-side only (never exposed to client)
-- File uploads validated for audio types
-- File size limits (100MB)
-- Input sanitization for search queries
-- CORS enabled for development (configurable)
-
-## Support & Documentation
-
-- [OpenAI API Docs](https://platform.openai.com/docs)
-- [Express.js Documentation](https://expressjs.com/)
-- [React Documentation](https://react.dev)
-- [Vite Documentation](https://vitejs.dev)
-- [MySQL Documentation](https://dev.mysql.com/doc/)
-
-## License
-
-MIT License - Feel free to use this project for personal or commercial purposes.
-
----
-
-**Happy recording!** 🎤✨
+Record the results in a table so the system can be evaluated professionally.

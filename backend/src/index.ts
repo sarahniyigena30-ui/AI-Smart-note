@@ -1,15 +1,21 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { initializeConnection, initializeDatabase, db } from './database.js';
 import recordingsRouter from './routes/recordings.js';
+import authRouter from './routes/auth.js';
+import { requireAuth } from './auth.js';
 
 dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, '../..');
 
-// Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? undefined : '*',
   credentials: true,
@@ -20,13 +26,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
 app.use(express.static('uploads'));
 
-// Request logging middleware
 app.use((req: Request, _res: Response, next: NextFunction) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Initialize database on startup
 let dbReady = false;
 
 (async () => {
@@ -34,14 +38,13 @@ let dbReady = false;
     await initializeConnection();
     await initializeDatabase();
     dbReady = true;
-    console.log('✓ Database initialized');
+    console.log('Database initialized');
   } catch (error) {
-    console.error('✗ Failed to initialize database:', error);
+    console.error('Failed to initialize database:', error);
     process.exit(1);
   }
 })();
 
-// Health check
 app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: dbReady ? 'ok' : 'initializing',
@@ -49,19 +52,45 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// API status
 app.get('/api/status', (_req: Request, res: Response) => {
   res.json({
     success: true,
     status: 'API is running',
     version: '1.0.0',
+    processing: 'internal-nlp',
   });
 });
 
-// Routes
-app.use('/api/recordings', recordingsRouter);
+app.use('/api/auth', authRouter);
 
-// 404 handler
+app.get('/api/model/voice-metrics', requireAuth, (_req: Request, res: Response) => {
+  const metricsPath = path.join(rootDir, 'models', 'voice_metrics.json');
+
+  if (!fs.existsSync(metricsPath)) {
+    res.status(404).json({
+      success: false,
+      error: 'Voice model metrics not found. Run scripts/train_voice_model.py first.',
+    });
+    return;
+  }
+
+  try {
+    const metrics = JSON.parse(fs.readFileSync(metricsPath, 'utf-8'));
+    res.json({
+      success: true,
+      data: metrics,
+    });
+  } catch (error) {
+    console.error('Failed to read voice model metrics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to read voice model metrics.',
+    });
+  }
+});
+
+app.use('/api/recordings', requireAuth, recordingsRouter);
+
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
@@ -69,11 +98,9 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
 
-  // Default error response
   const status = err.status || err.statusCode || 500;
   const message = err.message || 'Internal server error';
 
@@ -84,32 +111,35 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\nShutting down gracefully...');
-  db.close((err) => {
-    if (err) {
-      console.error('Error closing database:', err);
-    } else {
-      console.log('Database connection closed');
-    }
-    process.exit(0);
-  });
-});
-
-// Start server
 const server = app.listen(PORT, () => {
-  console.log(`\n✓ Server is running on port ${PORT}`);
-  console.log(`✓ API: http://localhost:${PORT}/api`);
-  console.log(`✓ Frontend: http://localhost:3000\n`);
+  console.log(`\nServer is running on port ${PORT}`);
+  console.log(`API: http://localhost:${PORT}/api`);
+  console.log('Frontend: http://localhost:3000\n');
 });
 
-// Handle server errors
+const shutdown = (signal: NodeJS.Signals) => {
+  console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+
+  server.close(() => {
+    db.close((err) => {
+      if (err) {
+        console.error('Error closing database:', err);
+      } else {
+        console.log('Database connection closed');
+      }
+      process.exit(err ? 1 : 0);
+    });
+  });
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
 server.on('error', (error: any) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`✗ Port ${PORT} is already in use`);
+    console.error(`Port ${PORT} is already in use`);
   } else {
-    console.error('✗ Server error:', error);
+    console.error('Server error:', error);
   }
   process.exit(1);
 });

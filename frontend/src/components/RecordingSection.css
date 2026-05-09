@@ -1,15 +1,16 @@
 .recording-section {
   background: white;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 30px;
   margin-bottom: 30px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid #dfe6ee;
+  box-shadow: 0 8px 18px rgba(23, 33, 43, 0.06);
 }
 
 .recording-section h2 {
   color: #333;
   margin-bottom: 20px;
-  border-bottom: 3px solid #667eea;
+  border-bottom: 3px solid #126d8f;
   padding-bottom: 10px;
 }
 
@@ -80,12 +81,12 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #126d8f;
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 5px 12px rgba(18, 109, 143, 0.24);
 }
 
 .btn-primary.recording {
@@ -99,21 +100,6 @@
 .btn-danger:hover:not(:disabled) {
   background-color: #c0392b;
   transform: translateY(-2px);
-}
-
-.btn-success {
-  background-color: #27ae60;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: #229954;
-  transform: translateY(-2px);
-}
-
-.selected-file {
-  margin-bottom: 20px;
-  color: #2c3e50;
-  font-size: 0.95em;
 }
 
 .speaker-row {
@@ -138,8 +124,8 @@
 }
 
 .speaker-row input:focus {
-  outline: 2px solid rgba(102, 126, 234, 0.25);
-  border-color: #667eea;
+  outline: 2px solid rgba(18, 109, 143, 0.2);
+  border-color: #126d8f;
 }
 
 .btn:disabled {
@@ -155,7 +141,7 @@
   padding: 20px;
   background: #f9f9f9;
   border-radius: 8px;
-  border: 2px solid #667eea;
+  border: 2px solid #126d8f;
 }
 
 .live-transcript {
@@ -279,12 +265,12 @@ progress::-webkit-progress-bar {
 }
 
 progress::-webkit-progress-value {
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: #126d8f;
   border-radius: 3px;
 }
 
 progress::-moz-progress-bar {
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: #126d8f;
   border-radius: 3px;
 }
 
